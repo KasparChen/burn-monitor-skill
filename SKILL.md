@@ -1,66 +1,81 @@
 ---
 name: token-burn-monitor
-description: "Real-time token consumption monitoring dashboard for OpenClaw agents. Tracks per-agent token usage, cost breakdown by model, cache hit rates, cron job status, and 30-day historical trends. Use when setting up cost monitoring for agents, checking daily token burn or cost, debugging which prompts cost the most, or reviewing cron job health. Features expandable user prompt tracking in per-call breakdowns."
+description: "Real-time token consumption monitoring dashboard for OpenClaw agents. Tracks per-agent token usage, cost breakdown by model, cache hit rates, cron job status, and 30-day historical trends. Use when setting up cost monitoring, checking daily token burn, debugging which prompts cost the most, or reviewing cron job health. Features swappable themes and expandable user prompt tracking in per-call breakdowns."
 ---
 
 # Token Burn Monitor
 
-Zero-dependency Node.js dashboard for monitoring OpenClaw agent token consumption.
+Zero-dependency Node.js dashboard. Core API + swappable frontend themes.
+
+## Architecture
+
+```
+server.js          → Core API (stable, don't modify)
+themes/default/    → Default dark dashboard theme
+themes/<custom>/   → User/agent-generated themes
+API.md             → API contract for theme developers
+config.json        → Port, theme, agents, pricing overrides
+```
 
 ## Quick Start
 
 ```bash
 bash start.sh            # Start (default port 3847)
 bash start.sh status     # Check status
-bash start.sh restart    # Restart
+bash start.sh restart    # Restart after config change
 bash start.sh stop       # Stop
 ```
 
-Dashboard: `http://localhost:3847`
-
 ## Configuration
 
-Copy `config.default.json` → `config.json` to customize:
+Copy `config.default.json` to `config.json`:
 
 ```json
 {
   "port": 3847,
+  "theme": "default",
   "agents": {
-    "main": { "name": "Karl", "icon": "/assets/karl.png" },
-    "helper": { "name": "Helper Bot", "icon": null }
+    "main": { "name": "Karl", "icon": "/assets/karl.png" }
   },
-  "modelPricing": {
-    "custom/model": { "input": 2, "output": 8, "cacheRead": 0.2, "cacheWrite": 2, "provider": "Custom" }
-  }
+  "modelPricing": {}
 }
 ```
 
-- **agents**: Display names and icons. Agents are auto-discovered from the agents directory; config only overrides display.
-- **port**: Dashboard port. Also settable via `PORT` env var.
-- **modelPricing**: Add/override model pricing ($ per 1M tokens).
+- **theme**: Directory name under `themes/`. Default: `"default"`
+- **agents**: Display names/icons. Auto-discovered; config only overrides display.
+- **port**: Also settable via `PORT` env var.
+- **modelPricing**: Override/add model pricing ($/1M tokens).
 
-Set `OPENCLAW_AGENTS_DIR` env var to override the default agents directory (`/home/node/.openclaw/agents`).
+Set `OPENCLAW_AGENTS_DIR` to override agent directory (default: `/home/node/.openclaw/agents`).
 
-## Dashboard Features
+## Themes
 
-- **Overview stats**: Total tokens, queries, messages, cache hits, daily cost
-- **Agent cards**: Per-agent breakdown with input/output/cache metrics, model costs, last active time
-- **Breakdown modal**: Click an agent card → per-call table with time, model, token distribution, tool calls, cost
-- **Prompt tracking**: Click a row in breakdown → expand to see the user prompt that triggered it
-- **Cost history**: Click the cost stat → 30-day history with per-agent drill-down
-- **Cron jobs**: Scheduled job overview grouped by agent, with run history
+Themes live in `themes/<name>/`. Minimum: one `index.html` that fetches data from the API.
 
-## Agent Icons
+To create a custom theme:
+1. Read `API.md` for all available endpoints
+2. Create `themes/my-theme/index.html`
+3. Set `"theme": "my-theme"` in config.json
+4. Restart
 
-Place custom icons in `public/assets/` and reference them in config:
-```json
-{ "main": { "name": "Karl", "icon": "/assets/karl.png" } }
-```
+The default theme (`themes/default/`) is a full reference implementation.
 
-Agents without icons get auto-generated initials with deterministic colors.
+## API Overview
+
+All endpoints return JSON. Full docs in `API.md`.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/config` | Agent names and icons |
+| `GET /api/stats?date=` | All agents aggregated |
+| `GET /api/agent/:id?date=` | Single agent with per-call breakdown |
+| `GET /api/history?days=` | 30-day cost history |
+| `GET /api/pricing` | Model pricing table |
+| `GET /api/crons` | Scheduled jobs |
+| `GET /api/cron/:id/runs` | Job run history |
 
 ## Troubleshooting
 
-- **No data**: Check that `OPENCLAW_AGENTS_DIR` points to the correct directory with `.jsonl` session files.
-- **Port in use**: Change port in config.json or `PORT=4000 bash start.sh`
-- **Stale process**: `bash start.sh stop && bash start.sh start`
+- **No data**: Verify `OPENCLAW_AGENTS_DIR` points to correct agents directory.
+- **Port conflict**: `PORT=4000 bash start.sh`
+- **Theme not loading**: Check `themes/<name>/index.html` exists.
