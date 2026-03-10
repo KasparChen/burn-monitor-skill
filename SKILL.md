@@ -1,12 +1,6 @@
 ---
 name: token-burn-monitor
-description: >
-  Real-time token consumption monitoring dashboard for OpenClaw agents.
-  Tracks per-agent token usage, cost breakdown by model, cache hit rates,
-  cron job status, and 30-day historical trends. Use when: (1) setting up
-  cost monitoring for agents, (2) checking daily token burn or cost,
-  (3) debugging which prompts cost the most, (4) reviewing cron job health.
-  Features expandable user prompt tracking in per-call breakdowns.
+description: "Real-time token consumption monitoring dashboard for OpenClaw agents. Tracks per-agent token usage, cost breakdown by model, cache hit rates, cron job status, and 30-day historical trends. Use when setting up cost monitoring for agents, checking daily token burn or cost, debugging which prompts cost the most, or reviewing cron job health. Features expandable user prompt tracking in per-call breakdowns."
 ---
 
 # Token Burn Monitor
