@@ -1,7 +1,6 @@
 {
   "port": 3847,
-  "agents": {
-    "main": { "name": "Main Agent", "icon": null }
-  },
+  "theme": "default",
+  "agents": {},
   "modelPricing": {}
 }

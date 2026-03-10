@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Token Burn Monitor v4.0
- * Generalized OpenClaw Skill version
+ * Token Burn Monitor v5.0
+ * Modular OpenClaw Skill — Core API + Swappable Themes
  * - Auto-discovers agents from AGENTS_DIR
  * - Configurable via config.json
- * - No hardcoded agent list
+ * - Theme system: themes/<name>/ served as static files
+ * - API-first: all data via JSON endpoints
  */
 
 const http = require('http');
@@ -17,13 +18,14 @@ const AGENTS_DIR = process.env.OPENCLAW_AGENTS_DIR || '/home/node/.openclaw/agen
 
 // Load config
 function loadConfig() {
-  const defaults = { port: 3847, agents: {}, modelPricing: {} };
+  const defaults = { port: 3847, theme: 'default', agents: {}, modelPricing: {} };
   const configPath = path.join(SKILL_DIR, 'config.json');
   try {
     if (fs.existsSync(configPath)) {
       const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       return {
         port: userConfig.port || defaults.port,
+        theme: userConfig.theme || defaults.theme,
         agents: { ...defaults.agents, ...userConfig.agents },
         modelPricing: { ...defaults.modelPricing, ...userConfig.modelPricing }
       };
@@ -34,6 +36,7 @@ function loadConfig() {
 
 const CONFIG = loadConfig();
 const PORT = process.env.PORT || CONFIG.port;
+const THEME_DIR = path.join(SKILL_DIR, 'themes', CONFIG.theme);
 
 // Discover agents by scanning AGENTS_DIR
 function discoverAgents() {
@@ -607,12 +610,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/' || url.pathname === '/index.html') {
-    serveStatic(res, path.join(SKILL_DIR, 'public', 'index.html'), 'text/html');
+    serveStatic(res, path.join(THEME_DIR, 'index.html'), 'text/html');
     return;
   }
   
   if (url.pathname.startsWith('/assets/')) {
-    const filePath = path.join(SKILL_DIR, 'public', url.pathname);
+    const filePath = path.join(THEME_DIR, url.pathname);
     const ext = path.extname(filePath);
     const contentTypes = {
       '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -628,6 +631,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   const agentCount = Object.keys(getAgentConfig()).length;
-  console.log(`🔥 Token Burn Monitor v4.0 running at http://localhost:${PORT}`);
+  console.log(`🔥 Token Burn Monitor v5.0 running at http://localhost:${PORT}`);
+  console.log(`   Theme: ${CONFIG.theme} (${THEME_DIR})`);
   console.log(`   Discovered ${agentCount} agents from ${AGENTS_DIR}`);
 });
