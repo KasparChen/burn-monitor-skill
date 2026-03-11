@@ -117,19 +117,11 @@ Your Claw will read the API contract, build the HTML, and switch the config for 
 
 ### Show user prompts in per-call breakdown
 
-User prompts are **redacted by default** for privacy. If you want to see what triggered each API call (useful for debugging expensive prompts):
+User prompts are **redacted by default** — the API returns `"[redacted]"` for all prompt fields. To see what triggered each API call (useful for debugging expensive prompts), explicitly opt in:
 
 > **Prompt:** `In the token-burn-monitor config.json, set "showPrompts" to true and restart the dashboard.`
 
-Or via environment variable: `SHOW_PROMPTS=1 bash start.sh`
-
-### Expose the dashboard on your local network
-
-By default the dashboard only listens on `127.0.0.1` (localhost). If you want to access it from other devices on your network:
-
-> **Prompt:** `Set the BIND_HOST environment variable for token-burn-monitor to 0.0.0.0 and restart it. I want to access the dashboard from my phone.`
-
-Or: `BIND_HOST=0.0.0.0 bash start.sh`
+**Privacy note:** When enabled, up to 300 characters of each user prompt will be visible in the dashboard. Only enable this on a trusted machine where you are the sole user.
 
 ### Point to a different agents directory
 
@@ -166,12 +158,15 @@ All endpoints return JSON. API only accepts requests from localhost. Full refere
 
 ## Security
 
-- **Localhost only** — server binds to `127.0.0.1` by default; only explicitly settable via `BIND_HOST`
-- **No shell execution** — cron data fetched via `execFileSync` (no shell invocation)
-- **Prompts redacted** — user prompts show as `[redacted]` unless you opt in via `showPrompts: true`
-- **CORS restricted** — API only responds to requests from `localhost` / `127.0.0.1`
-- **CSP on themes** — HTML responses include `Content-Security-Policy` with `connect-src 'self'` to prevent data exfiltration
+- **Localhost only** — server binds to `127.0.0.1`, only accessible from the local machine
+- **No shell execution** — zero `child_process` usage; all data read from filesystem
+- **No outbound network** — default theme uses system fonts, makes zero external requests
+- **No CORS** — no cross-origin headers are set; API is same-origin only
+- **GET-only** — all non-GET requests are rejected with 405
+- **Prompts redacted** — user prompts show as `[redacted]` by default, explicit opt-in required
+- **CSP enforced** — HTML responses include `Content-Security-Policy` with `connect-src 'self'` and `font-src 'self'`
 - **Path traversal guard** — theme static file serving is sandboxed to the theme directory
+- **Imports** — `server.js` only imports `http`, `fs`, `path` from Node.js stdlib
 
 ## Troubleshooting
 
@@ -183,7 +178,6 @@ All endpoints return JSON. API only accepts requests from localhost. Full refere
 | Wrong cost numbers | Add correct model pricing to `config.json` → `modelPricing` |
 | Agents missing | They're auto-discovered. Check if the agent directory has session files |
 | Prompts showing [redacted] | Set `"showPrompts": true` in config.json and restart |
-| Can't access from phone/LAN | Set `BIND_HOST=0.0.0.0` when starting |
 
 ## Links
 

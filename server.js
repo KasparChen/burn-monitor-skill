@@ -489,7 +489,7 @@ function serveStatic(res, filePath, contentType) {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
     const headers = { 'Content-Type': contentType };
     if (contentType === 'text/html') {
-      headers['Content-Security-Policy'] = `default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; connect-src 'self'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`;
+      headers['Content-Security-Policy'] = `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'`;
     }
     res.writeHead(200, headers);
     res.end(data);
