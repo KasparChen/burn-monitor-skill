@@ -1,7 +1,7 @@
 {
   "port": 3847,
   "theme": "default",
-  "showPrompts": true,
+  "showPrompts": false,
   "agents": {},
   "modelPricing": {}
 }

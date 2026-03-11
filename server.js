@@ -11,14 +11,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const SKILL_DIR = path.dirname(require.main.filename || __filename);
 const AGENTS_DIR = process.env.OPENCLAW_AGENTS_DIR || '/home/node/.openclaw/agents';
 
 // Load config
 function loadConfig() {
-  const defaults = { port: 3847, theme: 'default', showPrompts: true, agents: {}, modelPricing: {} };
+  const defaults = { port: 3847, theme: 'default', showPrompts: false, agents: {}, modelPricing: {} };
   const configPath = path.join(SKILL_DIR, 'config.json');
   try {
     if (fs.existsSync(configPath)) {
@@ -149,8 +149,8 @@ function cronToHuman(expr) {
 
 function redactPrompt(text) {
   if (!text) return null;
-  const showPrompts = process.env.SHOW_PROMPTS !== '0' && (CONFIG.showPrompts !== false);
-  if (!showPrompts) return text.slice(0, 80) + (text.length > 80 ? '...' : '');
+  const showPrompts = process.env.SHOW_PROMPTS === '1' || CONFIG.showPrompts === true;
+  if (!showPrompts) return '[redacted]';
   return text.slice(0, 300) + (text.length > 300 ? '...' : '');
 }
 
@@ -447,7 +447,7 @@ function getHistory(days = 30) {
 
 function getCronJobs() {
   try {
-    const result = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 5000 });
+    const result = execFileSync('openclaw', ['cron', 'list', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] });
     const data = JSON.parse(result);
     return data.jobs || [];
   } catch (e) {
@@ -460,7 +460,7 @@ function getCronRuns(jobId) {
     return { runs: [], error: 'Invalid job ID' };
   }
   try {
-    const result = execSync(`openclaw cron runs --id ${jobId} 2>/dev/null`, { encoding: 'utf8', timeout: 5000 });
+    const result = execFileSync('openclaw', ['cron', 'runs', '--id', jobId], { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] });
     const data = JSON.parse(result);
     return { runs: data.entries || [], total: data.total || 0 };
   } catch (e) {
@@ -469,9 +469,17 @@ function getCronRuns(jobId) {
 }
 
 function serveStatic(res, filePath, contentType) {
-  fs.readFile(filePath, (err, data) => {
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(path.resolve(THEME_DIR))) {
+    res.writeHead(403); res.end('Forbidden'); return;
+  }
+  fs.readFile(resolved, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
-    res.writeHead(200, { 'Content-Type': contentType });
+    const headers = { 'Content-Type': contentType };
+    if (contentType === 'text/html') {
+      headers['Content-Security-Policy'] = `default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; connect-src 'self'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`;
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
