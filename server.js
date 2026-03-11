@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * Token Burn Monitor v5.0
+ * Token Burn Monitor v5.3
  * Modular OpenClaw Skill — Core API + Swappable Themes
  * - Auto-discovers agents from AGENTS_DIR
- * - Configurable via config.json
- * - Theme system: themes/<name>/ served as static files
- * - API-first: all data via JSON endpoints
+ * - Reads cron schedule from filesystem (no shell execution)
+ * - Theme system: themes/<name>/ served as static files with CSP
+ * - API-first: all data via JSON endpoints, GET-only, localhost-bound
  */
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 
 const SKILL_DIR = path.dirname(require.main.filename || __filename);
 const AGENTS_DIR = process.env.OPENCLAW_AGENTS_DIR || '/home/node/.openclaw/agents';
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || '/home/node/.openclaw';
+const CRON_JOBS_FILE = path.join(OPENCLAW_HOME, 'cron', 'jobs.json');
 
 // Load config
 function loadConfig() {
@@ -447,8 +448,8 @@ function getHistory(days = 30) {
 
 function getCronJobs() {
   try {
-    const result = execFileSync('openclaw', ['cron', 'list', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] });
-    const data = JSON.parse(result);
+    if (!fs.existsSync(CRON_JOBS_FILE)) return [];
+    const data = JSON.parse(fs.readFileSync(CRON_JOBS_FILE, 'utf8'));
     return data.jobs || [];
   } catch (e) {
     return [];
@@ -460,9 +461,20 @@ function getCronRuns(jobId) {
     return { runs: [], error: 'Invalid job ID' };
   }
   try {
-    const result = execFileSync('openclaw', ['cron', 'runs', '--id', jobId], { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] });
-    const data = JSON.parse(result);
-    return { runs: data.entries || [], total: data.total || 0 };
+    const jobs = getCronJobs();
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return { runs: [], error: 'Job not found' };
+    const state = job.state || {};
+    const runs = [];
+    if (state.lastRunAtMs) {
+      runs.push({
+        runAtMs: state.lastRunAtMs,
+        status: state.lastRunStatus || 'unknown',
+        durationMs: state.lastDurationMs || 0,
+        nextRunAtMs: state.nextRunAtMs || null
+      });
+    }
+    return { runs, total: runs.length };
   } catch (e) {
     return { runs: [], error: e.message };
   }
@@ -487,14 +499,7 @@ function serveStatic(res, filePath, contentType) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   
-  const origin = req.headers.origin || '';
-  const allowedOrigins = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  if (req.method !== 'GET') { res.writeHead(405); res.end('Method not allowed'); return; }
 
   if (url.pathname === '/api/config') {
     const agentConfig = getAgentConfig();
@@ -655,7 +660,7 @@ const server = http.createServer((req, res) => {
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 server.listen(PORT, BIND_HOST, () => {
   const agentCount = Object.keys(getAgentConfig()).length;
-  console.log(`🔥 Token Burn Monitor v5.0 running at http://localhost:${PORT}`);
+  console.log(`🔥 Token Burn Monitor v5.3 running at http://${BIND_HOST}:${PORT}`);
   console.log(`   Theme: ${CONFIG.theme} (${THEME_DIR})`);
   console.log(`   Discovered ${agentCount} agents from ${AGENTS_DIR}`);
 });

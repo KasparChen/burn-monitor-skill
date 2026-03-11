@@ -6,12 +6,12 @@ You're running agents 24/7. They're burning tokens across models, sessions, cron
 
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Version](https://img.shields.io/badge/version-5.0.0-brightgreen)
+![Version](https://img.shields.io/badge/version-5.3.0-brightgreen)
 
 ## What You Get
 
 - **Per-agent cost breakdown** — see exactly how much each agent burns daily, split by model (Claude, GPT, Gemini, MiniMax, etc.)
-- **Per-call drill-down** — expand any agent to see individual API calls: which user prompt triggered it, what tools were called, token split (input/output/cache read/cache write/reasoning), and cost
+- **Per-call drill-down** — expand any agent to see individual API calls: what tools were called, token split (input/output/cache read/cache write/reasoning), and cost. User prompts are redacted by default for privacy (opt-in via config)
 - **Cache efficiency tracking** — cache hit rate per agent, so you know if your context caching is actually saving money
 - **30-day cost history** — daily bar chart with per-agent stacking, spot trends and anomalies at a glance
 - **Cron job health** — all scheduled jobs, their last run status, duration, consecutive errors, and next run time
@@ -115,6 +115,22 @@ The default theme is a dark dashboard. If you want something different — minim
 
 Your Claw will read the API contract, build the HTML, and switch the config for you.
 
+### Show user prompts in per-call breakdown
+
+User prompts are **redacted by default** for privacy. If you want to see what triggered each API call (useful for debugging expensive prompts):
+
+> **Prompt:** `In the token-burn-monitor config.json, set "showPrompts" to true and restart the dashboard.`
+
+Or via environment variable: `SHOW_PROMPTS=1 bash start.sh`
+
+### Expose the dashboard on your local network
+
+By default the dashboard only listens on `127.0.0.1` (localhost). If you want to access it from other devices on your network:
+
+> **Prompt:** `Set the BIND_HOST environment variable for token-burn-monitor to 0.0.0.0 and restart it. I want to access the dashboard from my phone.`
+
+Or: `BIND_HOST=0.0.0.0 bash start.sh`
+
 ### Point to a different agents directory
 
 If your agents aren't in the default location:
@@ -136,7 +152,7 @@ setup.sh               Post-install info
 
 ## API
 
-All endpoints return JSON. CORS enabled. Full reference in [API.md](./API.md).
+All endpoints return JSON. API only accepts requests from localhost. Full reference in [API.md](./API.md).
 
 | Endpoint | Returns |
 |---|---|
@@ -148,6 +164,15 @@ All endpoints return JSON. CORS enabled. Full reference in [API.md](./API.md).
 | `GET /api/crons` | All scheduled cron jobs grouped by agent |
 | `GET /api/cron/:jobId/runs` | Run history for a specific cron job |
 
+## Security
+
+- **Localhost only** — server binds to `127.0.0.1` by default; only explicitly settable via `BIND_HOST`
+- **No shell execution** — cron data fetched via `execFileSync` (no shell invocation)
+- **Prompts redacted** — user prompts show as `[redacted]` unless you opt in via `showPrompts: true`
+- **CORS restricted** — API only responds to requests from `localhost` / `127.0.0.1`
+- **CSP on themes** — HTML responses include `Content-Security-Policy` with `connect-src 'self'` to prevent data exfiltration
+- **Path traversal guard** — theme static file serving is sandboxed to the theme directory
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -156,7 +181,9 @@ All endpoints return JSON. CORS enabled. Full reference in [API.md](./API.md).
 | Port conflict | `PORT=4000 bash start.sh` or set `"port"` in config.json |
 | Theme not loading | Check `themes/<name>/index.html` exists |
 | Wrong cost numbers | Add correct model pricing to `config.json` → `modelPricing` |
-| Agents missing | They're auto-discovered. Check if the agent directory has session files. |
+| Agents missing | They're auto-discovered. Check if the agent directory has session files |
+| Prompts showing [redacted] | Set `"showPrompts": true` in config.json and restart |
+| Can't access from phone/LAN | Set `BIND_HOST=0.0.0.0` when starting |
 
 ## Links
 
