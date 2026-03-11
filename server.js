@@ -18,7 +18,7 @@ const AGENTS_DIR = process.env.OPENCLAW_AGENTS_DIR || '/home/node/.openclaw/agen
 
 // Load config
 function loadConfig() {
-  const defaults = { port: 3847, theme: 'default', agents: {}, modelPricing: {} };
+  const defaults = { port: 3847, theme: 'default', showPrompts: true, agents: {}, modelPricing: {} };
   const configPath = path.join(SKILL_DIR, 'config.json');
   try {
     if (fs.existsSync(configPath)) {
@@ -26,6 +26,7 @@ function loadConfig() {
       return {
         port: userConfig.port || defaults.port,
         theme: userConfig.theme || defaults.theme,
+        showPrompts: userConfig.showPrompts !== undefined ? userConfig.showPrompts : defaults.showPrompts,
         agents: { ...defaults.agents, ...userConfig.agents },
         modelPricing: { ...defaults.modelPricing, ...userConfig.modelPricing }
       };
@@ -144,6 +145,13 @@ function cronToHuman(expr) {
   }
   
   return expr;
+}
+
+function redactPrompt(text) {
+  if (!text) return null;
+  const showPrompts = process.env.SHOW_PROMPTS !== '0' && (CONFIG.showPrompts !== false);
+  if (!showPrompts) return text.slice(0, 80) + (text.length > 80 ? '...' : '');
+  return text.slice(0, 300) + (text.length > 300 ? '...' : '');
 }
 
 function getProvider(model) {
@@ -290,7 +298,7 @@ function parseSessionFileSync(filePath, targetDate) {
             inputCost, outputCost, cacheReadCost, cacheWriteCost,
             toolCallCount,
             toolNames,
-            userPrompt: lastUserPrompt ? lastUserPrompt.text : null
+            userPrompt: lastUserPrompt ? redactPrompt(lastUserPrompt.text) : null
           });
           
           stats.latestStatus = {
@@ -448,6 +456,9 @@ function getCronJobs() {
 }
 
 function getCronRuns(jobId) {
+  if (!/^[\w\-]+$/.test(jobId)) {
+    return { runs: [], error: 'Invalid job ID' };
+  }
   try {
     const result = execSync(`openclaw cron runs --id ${jobId} 2>/dev/null`, { encoding: 'utf8', timeout: 5000 });
     const data = JSON.parse(result);
@@ -468,7 +479,11 @@ function serveStatic(res, filePath, contentType) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin || '';
+  const allowedOrigins = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
@@ -629,7 +644,8 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
+server.listen(PORT, BIND_HOST, () => {
   const agentCount = Object.keys(getAgentConfig()).length;
   console.log(`🔥 Token Burn Monitor v5.0 running at http://localhost:${PORT}`);
   console.log(`   Theme: ${CONFIG.theme} (${THEME_DIR})`);
