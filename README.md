@@ -90,12 +90,17 @@ All endpoints return JSON. Full reference in [API.md](./API.md).
 
 Create `themes/my-theme/index.html`, set `"theme": "my-theme"` in config, restart. Your theme fetches data from the API endpoints — see `themes/default/` as a reference implementation.
 
-## OpenClaw Skill
+## Install
 
-This project is published as an OpenClaw skill on [ClawHub](https://clawhub.com):
+**Via [skills.sh](https://skills.sh):**
 
 ```bash
-# Install via ClawHub
+npx skills add KasparChen/burn-monitor-skill
+```
+
+**Via [ClawHub](https://clawhub.com):**
+
+```bash
 npx clawhub install token-burn-monitor
 ```
 
